@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    {% include 'layouts/head.html' %}
+    {% block custom_meta_data %}{% endblock %}
+</head>
+<body>
+    {% block content %}{% endblock %}
+
+    {% if csrf_token()|safe %}
+        <div style="visibility: hidden; display: none">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token()|safe }}">
+        </div>
+    {% endif %}
+</body>
+</html>
