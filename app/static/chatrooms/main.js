@@ -39,9 +39,9 @@ async function initialize(channelId) {
         document.getElementById(`channel-id-${deletedChannel.id}`).remove();
     });
     socket.on("channel_update", updatedChannel => {
-        const channel = document.getElementById(`channel-id-${deletedChannel.id}`);
-        channel.textContent = updatedChannel.name;
-        divChannel.onclick = () => switchChannel(updatedChannel.id);
+        const channel = document.getElementById(`channel-id-${updatedChannel.old_channel.id}`);
+        channel.textContent = updatedChannel.new_channel.name;
+        divChannel.onclick = () => switchChannel(updatedChannel.new_channel.id);
     });
     socket.on("message_create", newMessage => {
         newMessageSoundEffect.play();
@@ -50,6 +50,10 @@ async function initialize(channelId) {
     });
     socket.on("message_delete", deletedMessage => {
         console.log("Message deleted: " + deletedMessage);
+    });
+    socket.on("message_update", updatedMessage => {
+        const msg = document.getElementById(`message-content-id-${updatedMessage.before.id}`);
+        msg.textContent = updatedMessage.after.content;
     });
 }
 
@@ -98,6 +102,7 @@ async function sendMessage() {
 async function renderMessage(messageData) {
     const pContent = document.createElement("p");
     pContent.className = "message-content";
+    pContent.id = `message-content-id-${messageData.id}`;
     pContent.textContent = messageData.content;
 
     const separator = document.createElement("div");
