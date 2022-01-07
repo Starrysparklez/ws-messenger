@@ -28,7 +28,7 @@ def api_channel_list():
         "channels_data": [x.to_json() for x in channels]
     }, 200
 
-@api.route("/channel", methods=("GET", "PUT", "DELETE"))
+@api.route("/channel", methods=("GET", "PUT", "DELETE", "PATCH"))
 @csrf.exempt
 def api_channel():
     data = request.json
@@ -65,7 +65,11 @@ def api_channel():
     if request.method == "DELETE":
         try:
             channel = TextChannel.query.filter_by(id=data.get("id")).first()
-            channel.delete()
+            if not channel:
+                return {
+                    "error": "Channel does not exists"
+                }, 404
+            TextChannel.query.filter_by(id=data.get("id")).delete()
             db.session.commit()
         except Exception:
             print_exception()
@@ -82,7 +86,7 @@ def api_channel():
         }, 200
     if request.method == "PATCH":
         try:
-            channel = TextChannel.query.filter_by(id=data.get("id"))
+            channel = TextChannel.query.filter_by(id=data.get("id")).first()
             old_channel = copy(channel)
             channel.name = data.get("name") or channel.name
             channel.title = data.get("title") or channel.title
@@ -264,7 +268,7 @@ def api_message():
             },
             "after": {
                 "id": message.id,
-                "content": old_message.content,
+                "content": message.content,
                 "channel": {
                     "id": channel.id,
                     "name": channel.name,
