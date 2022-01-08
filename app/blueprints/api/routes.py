@@ -11,7 +11,31 @@ from copy import copy
 
 api = Blueprint("channels", __name__)
 
+def validate_token(request) -> User:
+    token = request.headers.get("Authorization")
+    if not token:
+        raise AttributeError("Provide an authorization token")
+    user = User.decode_auth_token(token)
+    if not user:
+        raise AttributeError("Incorrect credentials")
+    return user
+
 # ------
+
+@api.route("/user", methods=("GET",))
+@csrf.exempt
+def api_user_info():
+    try:
+        user = validate_token(request)
+    except AttributeError as error:
+        print_exception()
+        return { "error": str(error) }, 400
+
+    return {
+        "id": user.id,
+        "username": user.username,
+        "avatar_url": user.safe_avatar_url
+    }
 
 @api.route("/channels", methods=("GET",))
 @csrf.exempt
