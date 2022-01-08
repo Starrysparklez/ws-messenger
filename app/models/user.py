@@ -9,6 +9,7 @@ class User(UserMixin, db.Model):
     __tablename__ = 'users'
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(64), unique=True)
+    avatar_url = db.Column(db.String(256))
     password_hash = db.Column(db.String(128))
 
     @property
@@ -21,6 +22,10 @@ class User(UserMixin, db.Model):
 
     def verify_password(self, password):
         return check_password_hash(self.password_hash, password)
+
+    @property
+    def safe_avatar_url(self):
+        return self.avatar_url or "https://media.discordapp.net/attachments/600712545757822976/929305078765088818/390046883281633290.png"
 
     def generate_auth_token(self):
         payload = {

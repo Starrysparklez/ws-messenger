@@ -162,6 +162,7 @@ def api_message_list(channel_id: int):
             },
             "author": {
                 "id": author.id,
+                "avatar_url": author.safe_avatar_url,
                 "username": author.username
             }
         })
@@ -196,6 +197,7 @@ def api_message():
                 },
                 "author": {
                     "id": author.id,
+                    "avatar_url": author.safe_avatar_url,
                     "username": author.username
                 }
             }, 200
@@ -229,6 +231,7 @@ def api_message():
             },
             "author": {
                 "id": author.id,
+                "avatar_url": author.safe_avatar_url,
                 "username": author.username
             }
         }, to=channel.id)
@@ -257,6 +260,7 @@ def api_message():
             },
             "author": {
                 "id": author.id,
+                "avatar_url": author.safe_avatar_url,
                 "username": author.username
             }
         }, to=channel.id)
@@ -287,6 +291,7 @@ def api_message():
                 },
                 "author": {
                     "id": author.id,
+                    "avatar_url": author.safe_avatar_url,
                     "username": author.username
                 }
             },
