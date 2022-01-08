@@ -17,7 +17,6 @@ section.bottom {
     background-color: #2d2d31;
     display: flex;
 }
-
 div.channel-selector {
     width: 240px;
     height: 100%;
@@ -44,7 +43,7 @@ div.channel-entry:hover {
 div.channel-selector div.selected {
     background-color: #6f6d74;
 }
-div.content {
+div#content {
     width: calc(100% - 240px);
     background-color: #1a1a1a;
     overflow-y: scroll;
@@ -52,7 +51,7 @@ div.content {
     flex-direction: column;
     /* justify-content: flex-end; */
 }
-div.content > :first-child {
+div#content > :first-child {
     margin-top: auto !important;
 }
 textarea.message-field {

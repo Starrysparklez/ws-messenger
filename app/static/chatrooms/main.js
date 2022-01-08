@@ -1,4 +1,4 @@
-const placeMessagesThere = document.getElementById("messages-field");
+const placeMessagesThere = document.getElementById("content");
 const placeChannelsThere = document.getElementById("channel-list");
 const messageField = document.getElementById("textarea");
 
