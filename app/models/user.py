@@ -16,6 +16,8 @@ class User:
             User ID
         username: str
             User name
+        role: int
+            User's role
         avatar_hash: str
             Hash of the user's avatar
         password_hash: str
@@ -27,9 +29,14 @@ class User:
         """
         self.id: int = kwargs.pop("id", None)
         self.username: str = kwargs.pop("username", None)
+        self.role: int = kwargs.pop("role", 0)
+        # Roles:
+        # 0 - default user
+        # 100 - admin
+        # 101 - superadmin
         self.avatar_hash: str = kwargs.pop("avatar_hash", None)
         self.password_hash: str = kwargs.pop("password_hash", None)
-        self.created_at: datetime = kwargs.pop("created_at", None)
+        self.created_at: datetime = kwargs.pop("created_at", datetime.now())
         self.locale: str = kwargs.pop("locale", None)
 
     def to_json(self) -> typing.Dict:
