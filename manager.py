@@ -23,6 +23,12 @@ def rundev():
 
 @manager.command
 def makefake():
+    admin_user = db.get_user(username=ADMIN_LOGIN)
+    if not admin_user:
+        print("Can't save a fake dataset, because admin user doesn't exist."\
+              "\nRun the 'setup' command first.")
+        return
+
     fake_channel_data = (
         ("general", "Основной канал для основного общения. Хорошо сказано!!!!!"),
         ("chill", "Канал для расслабленного и не напряженного общения~"),
@@ -58,7 +64,6 @@ def makefake():
         print(f"Creating text channel #{name}...", end="\t")
         channel = db.create_text_channel(TextChannel(name=name, description=title))
         print(f"OK")
-        admin_user = db.get_user(username=ADMIN_LOGIN)
         for text in fake_message_data[name]:
             print(f"Creating message...", end="\t")
             db.create_message(
@@ -75,15 +80,28 @@ def setup():
         from app.models.user import User
         admin = User(username=ADMIN_LOGIN)
         admin.password = ADMIN_PASSWORD
+        admin.role = 101
         db.create_user(admin)
     except Exception:
         print("FAIL")
         print(indent(format_exception(), "\t"))
         return
     else:
-        print(f"OK\nAdmin credentials: {ADMIN_LOGIN}:{ADMIN_PASSWORD}")
+        print(f"OK\nAdmin credentials:\nUsername: {ADMIN_LOGIN}\nPassword: {ADMIN_PASSWORD}"\
+              f"\nAPI token: {admin.generate_auth_token()}")
 
     print("Setup complete.")
+
+@manager.command
+def updateadmin():
+    print("Admin user update...")
+    new_username = input("New username: ")
+    new_password = input("New password: ")
+    admin = db.get_user(role=101)
+    admin.username = new_username
+    admin.password = new_password
+    db.modify_user(admin)
+    print("OK")
 
 
 if __name__ == "__main__":
