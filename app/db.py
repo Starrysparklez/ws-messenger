@@ -33,7 +33,6 @@ class Database:
             condition.append(f"{x}=%s")
             values.append(kwargs[x])
         req = f"SELECT * FROM users WHERE {' AND '.join(condition)};"
-        print(req, values)
         with self.db.cursor() as cur:
             cur: cursor
             cur.execute(req, values)
@@ -64,12 +63,12 @@ class Database:
         new_id = next(snowflakes)
         user.id = new_id
         user.created_at = datetime.now()
-        args = ("id", "username", "password_hash", "created_at")
+        args = ("id", "username", "role", "password_hash", "created_at")
         with self.db.cursor() as cur:
             cur: cursor
             cur.execute(
-                f"INSERT INTO users({','.join(args)}) VALUES (%s,%s,%s,%s);",
-                (new_id, user.username, user.password_hash, user.created_at),
+                f"INSERT INTO users({','.join(args)}) VALUES (%s,%s,%s,%s,%s);",
+                (new_id, user.username, user.role, user.password_hash, user.created_at),
             )
             self.db.commit()
         return user
