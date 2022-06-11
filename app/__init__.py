@@ -1,44 +1,42 @@
-from flask import Flask, g
-from flask_sqlalchemy import SQLAlchemy
+import psycopg2
+from flask import Flask
 from flask_compress import Compress
 from flask_socketio import SocketIO
-from flask_login import LoginManager
 from flask_wtf import CSRFProtect
-from config import SECRET_KEY, SQL_URI, SESSION_COOKIE_SAMESITE
+from app.db import Database
+from config import (
+    SECRET_KEY,
+    SESSION_COOKIE_SAMESITE,
+    PSQL_DBNAME,
+    PSQL_HOST,
+    PSQL_PORT,
+    PSQL_USER,
+    PSQL_PASSWD,
+)
 
 socketio = SocketIO()
 compress = Compress()
 csrf = CSRFProtect()
-db = SQLAlchemy()
-login_manager = LoginManager()
-login_manager.login_view = "account.login"
-login_manager.session_protection = "basic"
+psql_connection = psycopg2.connect(
+    host=PSQL_HOST,
+    port=PSQL_PORT,
+    dbname=PSQL_DBNAME,
+    user=PSQL_USER,
+    password=PSQL_PASSWD,
+)
+db = Database(psql_connection)
+
 
 def create_flask():
     app = Flask(__name__)
-    app.config["SQLALCHEMY_DATABASE_URI"] = SQL_URI
-    app.config["SQLALCHEMY_TRACK_MODIFICATIONS"] = False
     app.config["SECRET_KEY"] = SECRET_KEY
     app.config["SESSION_COOKIE_SAMESITE"] = SESSION_COOKIE_SAMESITE
 
-    from app.models.user import User
-    @login_manager.user_loader
-    def load_user(user_id):
-        return User.query.filter_by(id=user_id).first()
-
-    login_manager.init_app(app)
     compress.init_app(app)
     socketio.init_app(app)
     csrf.init_app(app)
-    db.init_app(app)
-
-    from app.blueprints.account import account
-    app.register_blueprint(account, url_prefix="/account")
 
     from app.blueprints.api import api
-    app.register_blueprint(api, url_prefix="/api")
-
-    from app.blueprints.main import main
-    app.register_blueprint(main)
+    app.register_blueprint(api)
 
     return app, socketio
