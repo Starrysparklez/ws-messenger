@@ -5,5 +5,5 @@ flask-socketio
 flask-compress
 pyjwt
 eventlet
-snowflake-py
+snowflake-id
 psycopg2-binary
