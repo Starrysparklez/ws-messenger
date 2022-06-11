@@ -1,9 +1,9 @@
 flask
 flask-wtf
-flask-login
 flask-script==2.0.5
 flask-socketio
 flask-compress
-flask-sqlalchemy
 pyjwt
 eventlet
+snowflake-py
+psycopg2-binary
