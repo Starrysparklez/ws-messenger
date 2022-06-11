@@ -1,16 +1,20 @@
-from .. import db
+from datetime import datetime
 
-class Message(db.Model):
-    __tablename__ = 'messages'
-    id = db.Column(db.Integer, primary_key=True)
-    channel_id = db.Column(db.Integer)
-    content = db.Column(db.String(1024))
-    author_id = db.Column(db.Integer)
 
-    def to_json(self):
+class Message:
+    def __init__(self, **kwargs) -> None:
+        self.id: int = kwargs.pop("id", None)
+        self.channel_id: int = kwargs.pop("channel_id", None)
+        self.author_id: int = kwargs.pop("author_id", None)
+        self.content: str = kwargs.pop("content", None)
+        self.created_at: datetime = kwargs.pop("created_at", None)
+
+    def to_json(self) -> dict:
+        """Convert to json."""
         return {
-            "id": self.id,
-            "channel_id": self.channel_id,
-            "content": self.content,
-            "author_id": self.author_id
+            "id": str(self.id),
+            "channel_id": str(self.channel_id),
+            "content": str(self.content),
+            "author_id": str(self.author_id),
+            "created_at": self.created_at.timestamp()
         }
