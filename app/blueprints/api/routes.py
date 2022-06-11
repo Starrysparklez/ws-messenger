@@ -1,364 +1,297 @@
-from app.blueprints.account.forms import LoginForm
 from traceback import print_exc as print_exception
-from app.models.channel import TextChannel
+from app.models.text_channel import TextChannel
 from app.models.message import Message
 from flask import Blueprint, request
-from flask_login import login_user
-from flask_socketio import emit, join_room, leave_room, ConnectionRefusedError as ConnectionError
+from flask_socketio import (
+    emit,
+    join_room,
+    leave_room,
+    ConnectionRefusedError as ConnectionError,
+)
 from app.models.user import User
 from app import db, csrf, socketio
 from copy import copy
 
 api = Blueprint("channels", __name__)
 
-def validate_token(request) -> User:
+
+def decode_user(request) -> User:
     token = request.headers.get("Authorization")
     if not token:
-        raise AttributeError("Provide an authorization token")
-    user = User.decode_auth_token(token)
+        raise AttributeError("Provide an authorization token.")
+    try:
+        user = db.get_user(**User.decode_auth_token(token))
+    except RuntimeError:
+        raise AttributeError("Invalid credentials.")
     if not user:
-        raise AttributeError("Incorrect credentials")
+        raise AttributeError("Invalid credentials.")
     return user
 
+
 # ------
+
 
 @api.route("/user", methods=("GET",))
 @csrf.exempt
 def api_user_info():
     try:
-        user = validate_token(request)
-    except AttributeError as error:
-        print_exception()
-        return { "error": str(error) }, 400
+        user = decode_user(request)
+        for i in range(10):
+            print("TOKEN:", user.generate_auth_token())
+    except Exception as error:
+        return {"message": str(error)}, 400
 
-    return {
-        "id": user.id,
-        "username": user.username,
-        "avatar_url": user.safe_avatar_url
-    }
+    return user.to_json()
+
 
 @api.route("/channels", methods=("GET",))
 @csrf.exempt
 def api_channel_list():
-    user = User.decode_auth_token(request.headers.get("Authorization"))
-    if not request.headers.get("Authorization") or not user:
-        return {
-            "error": "Incorrect credentials"
-        }, 401
+    try:
+        user = decode_user(request)
+    except Exception as error:
+        print_exception()
+        return {"message": str(error)}, 400
 
-    channels = TextChannel.query.all()
+    channels = db.get_all_text_channels() or []
     return {
         "total_channels": len(channels),
-        "channels_data": [x.to_json() for x in channels]
+        "channels_data": [x.to_json() for x in channels],
     }, 200
+
 
 @api.route("/channel", methods=("GET", "PUT", "DELETE", "PATCH"))
 @csrf.exempt
 def api_channel():
+    try:
+        user = decode_user(request)
+    except Exception as error:
+        print_exception()
+        return {"message": str(error)}, 400
+
     data = request.json
 
-    user = User.decode_auth_token(request.headers.get("Authorization"))
-    if not request.headers.get("Authorization") or not user:
-        return {
-            "error": "Incorrect credentials"
-        }, 401
-
     if request.method == "GET":
-        channel = TextChannel.query.filter_by(id=data.get("id")).first()
+        channel = db.get_text_channel(id=int(data.get("id")))
         if channel:
             return channel.to_json(), 200
-        return {
-            "error": f"Channel with ID {data.get('id')} does not exists"
-        }, 404
+        return {"message": "NOT FOUND"}, 404
+
     if request.method == "PUT":
         try:
-            channel = TextChannel(name=data.get("name"), title=data.get("title"))
-            db.session.add(channel)
-            db.session.commit()
+            channel = TextChannel(
+                name=data.get("name"), description=data.get("description")
+            )
+            db.create_text_channel(channel)
         except Exception:
             print_exception()
-            return {
-                "error": "Can not create channel"
-            }, 500
-        socketio.emit("channel_create", {
-            "id": channel.id,
-            "name": channel.name,
-            "title": channel.title
-        }, broadcast=True)
+            return {"message": "ERR"}, 500
+        socketio.emit("channel_create", channel.to_json(), broadcast=True)
         return channel.to_json(), 200
+
     if request.method == "DELETE":
         try:
-            channel = TextChannel.query.filter_by(id=data.get("id")).first()
+            channel = db.get_text_channel(id=int(data.get("id")))
             if not channel:
-                return {
-                    "error": "Channel does not exists"
-                }, 404
-            TextChannel.query.filter_by(id=data.get("id")).delete()
-            db.session.commit()
+                return {"message": "ERR"}, 404
+            db.delete_text_channels(id=channel.id)
         except Exception:
             print_exception()
-            return {
-                "error": "Can not delete channel"
-            }, 500
-        socketio.emit("channel_delete", {
-            "id": channel.id,
-            "name": channel.name,
-            "title": channel.title
-        }, broadcast=True)
-        return {
-            "message": "Channel deleted"
-        }, 200
+            return {"message": "ERR"}, 500
+        socketio.emit("channel_delete", int(data.get("id")), broadcast=True)
+        return {"message": "OK"}, 200
+
     if request.method == "PATCH":
         try:
-            channel = TextChannel.query.filter_by(id=data.get("id")).first()
-            old_channel = copy(channel)
+            channel = db.get_text_channel(id=int(data.get("id")))
             channel.name = data.get("name") or channel.name
-            channel.title = data.get("title") or channel.title
-            db.session.commit()
+            channel.title = data.get("description") or channel.title
+            db.modify_text_channel(channel)
         except Exception:
             print_exception()
-            return {
-                "error": "Can not edit channel"
-            }, 500
-        socketio.emit("channel_update", {
-            "old_channel": {
-                "id": old_channel.id,
-                "name": old_channel.name,
-                "title": old_channel.title
-            },
-            "new_channel": {
-                "id": channel.id,
-                "name": channel.name,
-                "title": channel.title
-            }
-        }, broadcast=True)
-        return {
-            "message": "Channel edited"
-        }, 200
+            return {"message": "ERR"}, 500
+        socketio.emit("channel_update", {"channel": channel.to_json()}, broadcast=True)
+        return {"message": "OK"}, 200
+
 
 ## ------
+
 
 @api.route("/messages/<int:channel_id>", methods=("GET",))
 @csrf.exempt
 def api_message_list(channel_id: int):
-    user = User.decode_auth_token(request.headers.get("Authorization"))
-    if not request.headers.get("Authorization") or not user:
-        return {
-            "error": "Incorrect credentials"
-        }, 401
+    try:
+        user = decode_user(request)
+    except Exception as error:
+        return {"message": str(error)}, 400
 
     response_messages = []
-    messages = Message.query.filter_by(channel_id=channel_id).all()
-    for m in messages:
-        channel = TextChannel.query.filter_by(id=m.channel_id).first()
-        author = User.query.filter_by(id=m.author_id).first()
-        response_messages.append({
-            "id": m.id,
-            "content": m.content,
-            "channel": {
-                "id": channel.id,
-                "name": channel.name,
-                "title": channel.title
-            },
-            "author": {
-                "id": author.id,
-                "avatar_url": author.safe_avatar_url,
-                "username": author.username
-            }
-        })
-    return {
-        "total_messages": len(messages),
-        "messages_data": response_messages
-    }, 200
+    messages = db.get_messages(channel_id=channel_id) or []
+    if messages:
+        for m in messages:
+            channel = db.get_text_channel(id=m.channel_id)
+            author = db.get_user(id=m.author_id)
+            response_messages.append(
+                {
+                    "message": m.to_json(),
+                    "channel": channel.to_json(),
+                    "author": author.to_json(),
+                }
+            )
+    return {"total_messages": len(messages), "messages_data": response_messages}, 200
+
 
 @api.route("/message", methods=("GET", "PUT", "DELETE", "PATCH"))
 @csrf.exempt
 def api_message():
+    try:
+        user = decode_user(request)
+    except Exception as error:
+        return {"message": str(error)}, 400
+
     data = request.json
 
-    user = User.decode_auth_token(request.headers.get("Authorization"))
-    if not request.headers.get("Authorization") or not user:
-        return {
-            "error": "Incorrect credentials"
-        }, 401
-
     if request.method == "GET":
-        message = Message.query.filter_by(id=data.get("id")).first()
-        if message:
-            channel = TextChannel.query.filter_by(id=message.channel_id)
-            author = User.query.filter_by(id=message.author_id)
-            return {
-                "id": message.id,
-                "content": message.content,
-                "channel": {
-                    "id": channel.id,
-                    "name": channel.name,
-                    "title": channel.title
-                },
-                "author": {
-                    "id": author.id,
-                    "avatar_url": author.safe_avatar_url,
-                    "username": author.username
-                }
-            }, 200
+        messages = db.get_messages(id=int(data.get("id")))
+        if messages:
+            message = messages[0]
+            channel = db.get_text_channel(id=message.channel_id)
+            author = db.get_user(id=message.author_id)
+            data = message.to_json()
+            data["channel"] = channel.to_json()
+            data["author"] = author.to_json()
+            return data, 200
         else:
-            return {
-                "error": f"Message with ID {data.get('id')} does not exists"
-            }, 404
+            return {"message": "NOT FOUND"}, 404
+
     if request.method == "PUT":
         try:
             message = Message(
-                channel_id=data.get("channel_id"),
+                channel_id=int(data.get("channel_id")),
                 content=data.get("content"),
-                author_id=user.id
+                author_id=user.id,
             )
-            db.session.add(message)
-            db.session.commit()
+            db.create_message(message)
         except Exception:
             print_exception()
-            return {
-                "error": "Can not create message"
-            }, 500
-        channel = TextChannel.query.filter_by(id=message.channel_id).first()
-        author = User.query.filter_by(id=message.author_id).first()
-        socketio.emit("message_create", {
-            "id": message.id,
-            "content": message.content,
-            "channel": {
-                "id": channel.id,
-                "name": channel.name,
-                "title": channel.title
+            return {"message": "ERR"}, 500
+        channel = db.get_text_channel(id=message.channel_id)
+        author = db.get_user(id=message.author_id)
+        socketio.emit(
+            "message_create",
+            {
+                "message": message.to_json(),
+                "channel": channel.to_json(),
+                "author": author.to_json(),
             },
-            "author": {
-                "id": author.id,
-                "avatar_url": author.safe_avatar_url,
-                "username": author.username
-            }
-        }, to=channel.id)
-        return {
-            "message": "Message created"
-        }, 200
+        )
+        return {"message": "OK"}, 200
+
     if request.method == "DELETE":
         try:
-            message = Message.query.filter_by(id=data.get("id")).first()
-            message.delete()
-            db.session.commit()
+            message = db.get_messages(id=int(data.get("id")))[0]
+            db.delete_messages(id=int(data.get("id")))
         except Exception:
             print_exception()
-            return {
-                "error": "Can not delete message"
-            }, 500
-        channel = TextChannel.query.filter_by(id=message.channel_id).first()
-        author = User.query.filter_by(id=message.author_id).first()
-        socketio.emit("message_delete", {
-            "id": message.id,
-            "content": message.content,
-            "channel": {
-                "id": channel.id,
-                "name": channel.name,
-                "title": channel.title
-            },
-            "author": {
-                "id": author.id,
-                "avatar_url": author.safe_avatar_url,
-                "username": author.username
-            }
-        }, to=channel.id)
-        return {
-            "message": "Message deleted"
-        }, 200
+            return {"error": "Can not delete message"}, 500
+        socketio.emit("message_delete", message.to_json())
+        return {"message": "OK"}, 200
+
     if request.method == "PATCH":
         try:
-            message = Message.query.filter_by(id=data.get("id")).first()
-            old_message = copy(message)
+            message = db.get_messages(id=int(data.get("id")))[0]
             message.content = data.get("content")
-            db.session.commit()
+            db.modify_message(message)
         except Exception:
             print_exception()
-            return {
-                "error": "Can not edit message"
-            }, 500
-        channel = TextChannel.query.filter_by(id=message.channel_id).first()
-        author = User.query.filter_by(id=message.author_id).first()
-        socketio.emit("message_update", {
-            "before": {
-                "id": old_message.id,
-                "content": old_message.content,
-                "channel": {
-                    "id": channel.id,
-                    "name": channel.name,
-                    "title": channel.title
-                },
-                "author": {
-                    "id": author.id,
-                    "avatar_url": author.safe_avatar_url,
-                    "username": author.username
-                }
-            },
-            "after": {
-                "id": message.id,
-                "content": message.content,
-                "channel": {
-                    "id": channel.id,
-                    "name": channel.name,
-                    "title": channel.title
-                },
-                "author": {
-                    "id": author.id,
-                    "username": author.username
-                }
-            }
-        }, to=channel.id)
-        return {
-            "message": "Message edited"
-        }, 200
+            return {"message": "ERR"}, 500
+        socketio.emit("message_update", message.to_json())
+        return {"message": "Message edited"}, 200
+
 
 # ------
+
 
 @api.route("/login", methods=("POST",))
 @csrf.exempt
 def validate_account_login_and_password_to_retrieve_auth_token_for_this_account():
     data = request.json
-    user = User.query.filter_by(username=data.get("username")).first()
+    user = db.get_user(username=data.get("username"))
     if user and user.verify_password(data.get("password")):
-        login_user(user, True)
         return {
-            "user": {
-                "id": user.id,
-                "username": user.username
-            },
-            "token": user.generate_auth_token()
+            "user": user.to_json(),
+            "token": user.generate_auth_token(),
         }, 200
     else:
+        return {"user": None, "token": "Incorrect credentials"}, 401
+
+
+@api.route("/register", methods=("POST",))
+@csrf.exempt
+def register_user():
+    # {
+    #     "username": "Starrysparklez",
+    #     "password": "youshallnotpass"
+    # }
+    data = request.json
+    user = db.get_user(username=data.get("username"))
+    if user:
         return {
-            "user": None,
-            "token": "Incorrect credentials"
-        }, 401
+            "error": "User is already registered. Try to log in."
+        }, 409
+    user = User(username=data.get("username"))
+    user.password = data.get("password")
+    user = db.create_user(user)
+    return {
+        "user": user.to_json(),
+        "token": user.generate_auth_token()
+    }, 200
+
+
+@api.route("/update_user", methods=("POST",))
+@csrf.exempt
+def update_user():
+    # {
+    #     "username": "Starlight",
+    #     "password": "kapets"
+    # }
+    data = request.json
+    try:
+        user = decode_user(request)
+    except Exception as error:
+        print_exception()
+        return {"message": str(error)}, 400
+    if db.get_user(username=data.get("username")):
+        return {
+            "error": "This username is already used. Try to use other username."
+        }, 409
+    if data.get("username"):
+        user.username = data.get("username")
+    if data.get("password"):
+        if not user.verify_password(data.get("password")):
+            user.password = data.get("password")
+    user = db.modify_user(user)
+    
+    return {
+        "user": user.to_json(),
+        "token": user.generate_auth_token()
+    }
+  
+
 
 # ------
 
+
 @socketio.on("connect")
 def on_user_connect(auth):
-    if not auth or not User.decode_auth_token(auth.get("token")):
+    user = User.decode_auth_token(auth.get("token"))
+    if not auth or not user:
         raise ConnectionError("Incorrect credentials")
+    print(f"{user.username} ({user.id}) connected to the party!")
 
-@socketio.on("join")
-def join_channel(data):
-    if not data or not data.get("token"):
-        raise ConnectionError("You should provide authorization token")
-    user = User.decode_auth_token(data.get("token"))
-    if not user:
-        raise ConnectionError("Invalid credentials")
-
-    join_room(int(data.get("channelId")))
-    channel = TextChannel.query.filter_by(id=data.get("channelId")).first()
-    socketio.emit("message_create", {
-        "id": None,
-        "content": f"User @{user.username} joined this channel!",
-        "channel": {
-            "id": channel.id,
-            "name": channel.name,
-            "title": channel.title
-        },
-        "author": {}
-    }, to=channel.id)
+@api.after_request
+def add_cors_header(response):
+    print(response)
+    response.headers["Access-Control-Allow-Origin"] = "*"
+    response.headers["Access-Control-Allow-Headers"] = "*"
+    return response
