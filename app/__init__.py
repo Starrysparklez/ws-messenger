@@ -1,3 +1,4 @@
+import os
 import psycopg2
 from flask import Flask
 from flask_compress import Compress
@@ -37,6 +38,16 @@ def create_flask():
     csrf.init_app(app)
 
     from app.blueprints.api import api
+
     app.register_blueprint(api)
 
     return app, socketio
+
+
+for directory in (
+    "app/static",
+    "app/static/usercontent",
+    "app/static/usercontent/avatars",
+):
+    if not os.path.exists(directory):
+        os.mkdir(directory)
