@@ -36,8 +36,6 @@ def decode_user(request) -> User:
 def api_user_info():
     try:
         user = decode_user(request)
-        for i in range(10):
-            print("TOKEN:", user.generate_auth_token())
     except Exception as error:
         return {"message": str(error)}, 400
 
@@ -214,7 +212,7 @@ def api_message():
 
 @api.route("/login", methods=("POST",))
 @csrf.exempt
-def validate_account_login_and_password_to_retrieve_auth_token_for_this_account():
+def login():
     data = request.json
     user = db.get_user(username=data.get("username"))
     if user and user.verify_password(data.get("password")):
@@ -229,10 +227,6 @@ def validate_account_login_and_password_to_retrieve_auth_token_for_this_account(
 @api.route("/register", methods=("POST",))
 @csrf.exempt
 def register_user():
-    # {
-    #     "username": "Starrysparklez",
-    #     "password": "youshallnotpass"
-    # }
     data = request.json
     user = db.get_user(username=data.get("username"))
     if user:
