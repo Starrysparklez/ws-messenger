@@ -37,9 +37,9 @@ def api_user_info():
     try:
         user = decode_user(request)
     except Exception as error:
-        return {"message": str(error)}, 400
+        return {"error": str(error)}, 400
 
-    return user.to_json()
+    return {"user": user.to_json()}
 
 
 @api.route("/channels", methods=("GET",))
@@ -49,7 +49,7 @@ def api_channel_list():
         user = decode_user(request)
     except Exception as error:
         print_exception()
-        return {"message": str(error)}, 400
+        return {"error": str(error)}, 400
 
     channels = db.get_all_text_channels() or []
     return {
@@ -65,7 +65,7 @@ def api_channel():
         user = decode_user(request)
     except Exception as error:
         print_exception()
-        return {"message": str(error)}, 400
+        return {"error": str(error)}, 400
 
     data = request.json
 
@@ -73,7 +73,7 @@ def api_channel():
         channel = db.get_text_channel(id=int(data.get("id")))
         if channel:
             return channel.to_json(), 200
-        return {"message": "NOT FOUND"}, 404
+        return {"error": "NOT FOUND"}, 404
 
     if request.method == "PUT":
         try:
@@ -83,20 +83,20 @@ def api_channel():
             db.create_text_channel(channel)
         except Exception:
             print_exception()
-            return {"message": "ERR"}, 500
+            return {"error": "ERR"}, 500
         socketio.emit("channel_create", channel.to_json(), broadcast=True)
-        return channel.to_json(), 200
+        return {"message": "OK"}, 200
 
     if request.method == "DELETE":
         try:
             channel = db.get_text_channel(id=int(data.get("id")))
             if not channel:
-                return {"message": "ERR"}, 404
+                return {"error": "ERR"}, 404
             db.delete_text_channels(id=channel.id)
         except Exception:
             print_exception()
-            return {"message": "ERR"}, 500
-        socketio.emit("channel_delete", int(data.get("id")), broadcast=True)
+            return {"error": "ERR"}, 500
+        socketio.emit("channel_delete", channel.to_json(), broadcast=True)
         return {"message": "OK"}, 200
 
     if request.method == "PATCH":
@@ -107,8 +107,8 @@ def api_channel():
             db.modify_text_channel(channel)
         except Exception:
             print_exception()
-            return {"message": "ERR"}, 500
-        socketio.emit("channel_update", {"channel": channel.to_json()}, broadcast=True)
+            return {"error": "ERR"}, 500
+        socketio.emit("channel_update", channel.to_json(), broadcast=True)
         return {"message": "OK"}, 200
 
 
@@ -121,19 +121,19 @@ def api_message_list(channel_id: int):
     try:
         user = decode_user(request)
     except Exception as error:
-        return {"message": str(error)}, 400
+        return {"error": str(error)}, 400
 
     response_messages = []
     messages = db.get_messages(channel_id=channel_id) or []
     if messages:
         for m in messages:
-            channel = db.get_text_channel(id=m.channel_id)
             author = db.get_user(id=m.author_id)
+            channel = db.get_text_channel(id=m.channel_id)
             response_messages.append(
                 {
                     "message": m.to_json(),
-                    "channel": channel.to_json(),
                     "author": author.to_json(),
+                    "channel": channel.to_json()
                 }
             )
     return {"total_messages": len(messages), "messages_data": response_messages}, 200
@@ -145,7 +145,7 @@ def api_message():
     try:
         user = decode_user(request)
     except Exception as error:
-        return {"message": str(error)}, 400
+        return {"error": str(error)}, 400
 
     data = request.json
 
@@ -160,7 +160,7 @@ def api_message():
             data["author"] = author.to_json()
             return data, 200
         else:
-            return {"message": "NOT FOUND"}, 404
+            return {"error": "NOT FOUND"}, 404
 
     if request.method == "PUT":
         try:
@@ -254,7 +254,7 @@ def update_user():
         user = decode_user(request)
     except Exception as error:
         print_exception()
-        return {"message": str(error)}, 400
+        return {"error": str(error)}, 400
     if db.get_user(username=data.get("username")):
         return {
             "error": "This username is already used. Try to use other username."
