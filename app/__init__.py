@@ -15,7 +15,7 @@ from config import (
     PSQL_PASSWD,
 )
 
-socketio = SocketIO()
+socketio = SocketIO(cors_allowed_origins="*")
 compress = Compress()
 csrf = CSRFProtect()
 psql_connection = psycopg2.connect(
@@ -39,7 +39,11 @@ def create_flask():
 
     from app.blueprints.api import api
 
-    app.register_blueprint(api)
+    app.register_blueprint(api, url_prefix="/api")
+
+    from app.blueprints.main import general
+
+    app.register_blueprint(general)
 
     return app, socketio
 
