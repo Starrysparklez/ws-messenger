@@ -1,0 +1,193 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ws-messenger</title>
+    <link rel="stylesheet" href="/static/main/css/index.css">
+    <script src="/static/main/js/socket.io.min.js"></script>
+</head>
+<body>
+    <h1>Hello, <span id="userName" style="color: red">username</span> (Your ID: <span id="userId" style="color: blue">000</span>)</h1>
+    <h1>You are in #<span id="channelName" style="color: darkorchid">channel-name</span> channel!</h1>
+    <br>
+    <div style="display: flex;">
+        <div id="messages"></div>
+        <div id="channels"></div>
+    </div>
+    <textarea id="input"></textarea>
+    <!-- <script src="https://cdn.jsdelivr.net/npm/vue@2/dist/vue.js"></script>
+    <script src="assets/js/index.js"></script> -->
+    <script>
+        const deleteMessage = mid => {
+            console.log("mid is " + mid);
+            fetch("/api/message", {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": sessionStorage.getItem("token")
+                },
+                body: JSON.stringify({ "id": mid })
+            }).catch(err => alert("Unable to delete a message: " + err));
+        }
+        const deleteChannel = cid => {
+            console.log("cid is " + cid);
+            fetch("/api/channel", {
+                method: "DELETE",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": sessionStorage.getItem("token")
+                },
+                body: JSON.stringify({ "id": cid })
+            }).catch(err => alert("Unable to delete a channel: " + err));
+        }
+
+        document.addEventListener("DOMContentLoaded", function() {
+            var msgcontainer = document.getElementById("messages");
+            var cnlcontainer = document.getElementById("channels");
+            var input = document.getElementById("input");
+
+            (async () => {
+                var user;
+                try {
+                    if (!sessionStorage.getItem("token")) {
+                        let username = prompt("Username:");
+                        let password = prompt("Password:");
+                        var data = await (await fetch("/api/login", {
+                            method: "POST",
+                            headers: {
+                                "Content-Type": "application/json"
+                            },
+                            body: JSON.stringify({
+                                "username": username,
+                                "password": password
+                            })
+                        })).json();
+                        sessionStorage.setItem("token", data.token);
+                        user = data.user;
+                    } else {
+                        var data = await (await fetch("/api/user", {
+                            method: "GET",
+                            headers: {
+                                "Authorization": sessionStorage.getItem("token")
+                            }
+                        })).json();
+                    }
+                } catch(err) {
+                    console.error(err);
+                    sessionStorage.removeItem("token");
+                    alert("Cannot log in. Try to reload page.");
+                    return;
+                }
+                document.getElementById("userName").innerText = data.user.username;
+                document.getElementById("userId").innerText = data.user.id;
+                const urlParams = new URLSearchParams(window.location.search);
+                const currentChannelId = urlParams.get("c");
+
+                const updateChannelList = () => fetch("/api/channels", {
+                    method: "GET",
+                    headers: { "Authorization": sessionStorage.getItem("token") }
+                }).then(r => r.json()).then(channels => {
+                    if (!currentChannelId) {
+                        try {
+                            window.location = window.location + "?c=" + channels.channels_data[0].id;
+                        } catch(err) {
+                            alert("Cannot open the first channel. Try to create a channel via API.");
+                        }
+                    }
+                    for (const c of channels.channels_data) {
+                        console.log(c);
+                        if (c.id == currentChannelId)
+                            document.getElementById("channelName").innerText = c.name;
+                        cnlcontainer.innerHTML += `
+                            <div class="channel" channelId="${c.id}">
+                                <a href="?c=${c.id}" channelId="${c.id}">#${c.name}</a>
+                                <a onclick="deleteChannel('${c.id}');" style="color: red;">[X]</a>
+                                <br>
+                            </div>
+                        `;
+                    }
+                });
+                const updateMessageList = () => fetch(`/api/messages/${currentChannelId}`, {
+                    method: "GET",
+                    headers: {
+                        "Authorization": sessionStorage.getItem("token")
+                    }
+                }).then(r => r.json()).then(messages => {
+                    for (const md of messages.messages_data) {
+                        msgcontainer.innerHTML += `
+                            <div class="message" messageId="${md.message.id}">
+                                <h2 messageId="${md.message.id}">${md.author.name} (${md.author.id})</h2>
+                                <p messageId="${md.message.id}">${md.message.content} // Created at: ${md.message.created_at}; ID: ${md.message.id}</p>
+                                <a onclick="deleteMessage('${md.message.id}');" style="color: red;">[X]</a>
+                                <br>
+                            </div>
+                        `;
+                    }
+                });
+
+                updateChannelList();
+                updateMessageList();
+
+                // WEBSOCKET EVENTS
+                const socket = io("ws://localhost:5000", {
+                    auth: (cb) => cb({
+                        token: sessionStorage.getItem("token")
+                    })
+                });
+                socket.on("connect", () => {
+                    console.info("Connected to the socket");
+                });
+                socket.on("connect_error", () => {
+                    alert("Cannot connect to the socket");
+                })
+                socket.on("channel_create", c => {
+                    cnlcontainer.innerHTML += `
+                        <div class="channel" channelId="${c.id}">
+                            <a href="?c=${c.id}" channelId="${c.id}">#${c.name}</a>
+                            <a onclick="deleteChannel('${c.id}';" style="color: red;">[X]</a>
+                            <br>
+                        </div>
+                    `;
+                });
+                socket.on("channel_delete", c => document.querySelector(`div[channelid="${c.id}"]`).remove());
+                socket.on("channel_update", c => {
+                    var clink = document.querySelector(`a[channelId='${c.id}']`);
+                    clink.innerText = c.name;
+                });
+                socket.on("message_create", md => msgcontainer.innerHTML += `
+                    <div class="message" messageId="${md.message.id}">
+                        <h2 messageId="${md.message.id}">${md.author.name} (${md.author.id})</h2>
+                        <p messageId="${md.message.id}">${md.message.content} // Created at: ${md.message.created_at}; ID: ${md.message.id}</p>
+                        <a onclick="deleteMessage('${md.message.id}');" style="color: red;">[X]</a>
+                        <br>
+                    </div>
+                `);
+                socket.on("message_delete", md => document.querySelector(`div[messageid="${md.message.id}"]`).remove());
+                socket.on("message_update", md => {
+                    var clink = document.querySelector(`p[messageId='${md.message.id}']`);
+                    clink.innerText = `${md.message.content} // Created at: ${md.message.created_at}; ID: ${md.message.id}`;
+                });
+
+                input.addEventListener("keypress", e => {
+                    if (e.key === "Enter") {
+                        e.preventDefault();
+                        fetch("/api/message", {
+                            method: "PUT",
+                            headers: {
+                                "Content-Type": "application/json",
+                                "Authorization": sessionStorage.getItem("token")
+                            },
+                            body: JSON.stringify({
+                                "channel_id": currentChannelId,
+                                "content": input.value
+                            })
+                        })
+                    }
+                });
+            })();
+        });
+    </script>
+</body>
+</html>
