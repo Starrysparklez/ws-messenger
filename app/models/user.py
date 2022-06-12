@@ -18,8 +18,6 @@ class User:
             User name
         role: int
             User's role
-        avatar_hash: str
-            Hash of the user's avatar
         password_hash: str
             Hash of the user's password
         created_at: datetime.datetime
@@ -34,7 +32,6 @@ class User:
         # 0 - default user
         # 100 - admin
         # 101 - superadmin
-        self.avatar_hash: str = kwargs.pop("avatar_hash", None)
         self.password_hash: str = kwargs.pop("password_hash", None)
         self.created_at: datetime = kwargs.pop("created_at", datetime.now())
         self.locale: str = kwargs.pop("locale", None)

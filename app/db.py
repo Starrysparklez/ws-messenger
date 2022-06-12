@@ -41,7 +41,7 @@ class Database:
             return User(
                 id=data[0],
                 username=data[1],
-                avatar_hash=data[2],
+                role=data[2],
                 password_hash=data[3],
                 created_at=data[4],
                 locale=data[5],
@@ -52,8 +52,8 @@ class Database:
         with self.db.cursor() as cur:
             cur: cursor
             cur.execute(
-                f"UPDATE users SET username=%s, password_hash=%s WHERE id=%s;",
-                (user.username, user.password_hash, user.id)
+                f"UPDATE users SET username=%s, role=%s, password_hash=%s WHERE id=%s;",
+                (user.username, user.role, user.password_hash, user.id)
             )
             self.db.commit()
         return user

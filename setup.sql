@@ -2,7 +2,6 @@ CREATE TABLE IF NOT EXISTS users(
     id BIGINT PRIMARY KEY NOT NULL,
     username VARCHAR(24) NOT NULL,
     role SMALLINT DEFAULT 0,
-    avatar_hash VARCHAR(32) DEFAULT NULL,
     password_hash VARCHAR(120) NOT NULL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     locale_code VARCHAR(5) DEFAULT 'en_US'
