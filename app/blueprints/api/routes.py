@@ -279,14 +279,16 @@ def update_user():
 
 @socketio.on("connect")
 def on_user_connect(auth):
-    user = User.decode_auth_token(auth.get("token"))
+    user = db.get_user(id=User.decode_auth_token(auth.get("token")).get("id"))
     if not auth or not user:
         raise ConnectionError("Incorrect credentials")
     print(f"{user.username} ({user.id}) connected to the party!")
+
 
 @api.after_request
 def add_cors_header(response):
     print(response)
     response.headers["Access-Control-Allow-Origin"] = "*"
     response.headers["Access-Control-Allow-Headers"] = "*"
+    response.headers["Access-Control-Allow-Methods"] = "*"
     return response
