@@ -12,7 +12,7 @@ from app.models.user import User
 from app import db, csrf, socketio
 from copy import copy
 
-api = Blueprint("channels", __name__)
+api = Blueprint("api", __name__)
 
 
 def decode_user(request) -> User:
