@@ -42,7 +42,7 @@ class User:
             "id": str(self.id),
             "username": self.username,
             "avatar_url": self.avatar_url,
-            "created_at": self.created_at.timestamp(),
+            "created_at": str(self.created_at.timestamp()),
             "locale": self.locale,
         }
 

@@ -16,5 +16,5 @@ class Message:
             "channel_id": str(self.channel_id),
             "content": str(self.content),
             "author_id": str(self.author_id),
-            "created_at": self.created_at.timestamp()
+            "created_at": str(self.created_at.timestamp())
         }

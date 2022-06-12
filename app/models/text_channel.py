@@ -28,5 +28,5 @@ class TextChannel:
             "id": str(self.id),
             "name": self.name,
             "description": self.description,
-            "created_at": self.created_at.timestamp(),
+            "created_at": str(self.created_at.timestamp()),
         }
