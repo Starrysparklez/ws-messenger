@@ -137,7 +137,6 @@ class Database:
             condition.append(f"{x}=%s")
             values.append(kwargs[x])
         req = f"DELETE FROM text_channels WHERE {' AND '.join(condition)};"
-        print(req)
         with self.db.cursor() as cur:
             cur: cursor
             cur.execute(req, values)
@@ -166,7 +165,6 @@ class Database:
             condition.append(f"{x}=%s")
             values.append(kwargs[x])
         req = f"SELECT * FROM messages WHERE {' AND '.join(condition)};"
-        print(req)
         with self.db.cursor() as cur:
             cur: cursor
             cur.execute(req, values)
@@ -197,7 +195,6 @@ class Database:
             condition.append(f"{x}=%s")
             values.append(kwargs[x])
         req = f"DELETE FROM messages WHERE {' AND '.join(condition)}"
-        print(req)
         with self.db.cursor() as cur:
             cur: cursor
             cur.execute(req, values)
