@@ -175,9 +175,7 @@ def api_message():
             return {"message": "ERR"}, 500
         channel = db.get_text_channel(id=message.channel_id)
         author = db.get_user(id=message.author_id)
-        socketio.emit(
-            "message_create",
-            {
+        socketio.emit("message_create", {
                 "message": message.to_json(),
                 "channel": channel.to_json(),
                 "author": author.to_json(),
@@ -188,23 +186,35 @@ def api_message():
     if request.method == "DELETE":
         try:
             message = db.get_messages(id=int(data.get("id")))[0]
+            author = db.get_user(id=message.author_id)
+            channel = db.get_text_channel(id=message.channel_id)
             db.delete_messages(id=int(data.get("id")))
         except Exception:
             print_exception()
             return {"error": "Can not delete message"}, 500
-        socketio.emit("message_delete", message.to_json())
+        socketio.emit("message_delete", {
+            "author": author.to_json(),
+            "channel": channel.to_json(),
+            "message": message.to_json()
+        })
         return {"message": "OK"}, 200
 
     if request.method == "PATCH":
         try:
             message = db.get_messages(id=int(data.get("id")))[0]
+            author = db.get_user(id=message.author_id)
+            channel = db.get_text_channel(id=message.channel_id)
             message.content = data.get("content")
             db.modify_message(message)
         except Exception:
             print_exception()
             return {"message": "ERR"}, 500
-        socketio.emit("message_update", message.to_json())
-        return {"message": "Message edited"}, 200
+        socketio.emit("message_update", {
+            "author": author.to_json(),
+            "channel": channel.to_json(),
+            "message": message.to_json()
+        })
+        return {"message": "OK"}, 200
 
 
 # ------
@@ -221,7 +231,7 @@ def login():
             "token": user.generate_auth_token(),
         }, 200
     else:
-        return {"user": None, "token": "Incorrect credentials"}, 401
+        return {"error": "Incorrect credentials"}, 401
 
 
 @api.route("/register", methods=("POST",))
@@ -230,16 +240,11 @@ def register_user():
     data = request.json
     user = db.get_user(username=data.get("username"))
     if user:
-        return {
-            "error": "User is already registered. Try to log in."
-        }, 409
+        return {"error": "User is already registered. Try to log in."}, 409
     user = User(username=data.get("username"))
     user.password = data.get("password")
     user = db.create_user(user)
-    return {
-        "user": user.to_json(),
-        "token": user.generate_auth_token()
-    }, 200
+    return {"user": user.to_json(), "token": user.generate_auth_token()}, 200
 
 
 @api.route("/update_user", methods=("POST",))
@@ -265,12 +270,8 @@ def update_user():
         if not user.verify_password(data.get("password")):
             user.password = data.get("password")
     user = db.modify_user(user)
-    
-    return {
-        "user": user.to_json(),
-        "token": user.generate_auth_token()
-    }
-  
+
+    return {"user": user.to_json(), "token": user.generate_auth_token()}
 
 
 # ------
