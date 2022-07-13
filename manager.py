@@ -103,6 +103,15 @@ def updateadmin():
     db.modify_user(admin)
     print("OK")
 
+@manager.command
+def cleardb():
+    print("Deleting tables...")
+    for table_name in ("users", "messages", "channels"):
+        with db.connection.cursor() as cur:
+            cur: cursor
+            cur.execute("DROP TABLE " + table_name)
+        db.connection.commit()
+
 
 if __name__ == "__main__":
     manager.run()
