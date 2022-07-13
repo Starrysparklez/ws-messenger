@@ -1,0 +1,13 @@
+Place your private and public key files in this directory.
+Name the private key "private" and the public key "public.pub".
+
+[app]
+  |- ...
+  |- ...
+  |- keypair
+  |  |- .gitignore
+  |  |- place-keys-here
+  |  |- private
+  |  \- public.pub
+  |- ...
+  \- ...
