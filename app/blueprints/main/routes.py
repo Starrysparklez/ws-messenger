@@ -4,7 +4,7 @@ general = Blueprint("main", __name__)
 
 @general.route("/", methods=("GET",))
 def index():
-    return "Hello World! You're on the main page."
+    return "Hello World! You're on the main page. <a href='/chat'>Go to the messenger demo.</a>"
 
 @general.route("/chat", methods=("GET",))
 def chat_route():
