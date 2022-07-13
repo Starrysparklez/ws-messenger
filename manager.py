@@ -2,6 +2,7 @@ from app import create_flask, db
 from flask_script import Manager
 from traceback import format_exc as format_exception
 from textwrap import indent
+from psycopg2._psycopg import connection, cursor
 
 from config import ADMIN_LOGIN, ADMIN_PASSWORD, SERVER_ADDRESS, SERVER_PORT
 
