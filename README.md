@@ -13,7 +13,7 @@ $ git clone https://codeberg.org/Starrysparklez/ws-messenger
 ```
 2. Install dependencies
 ```shell
-$ pip3 install -r req.txt
+$ pip3 install -r requirements.txt
 ```
 3. Create an admin account
 ```shell
