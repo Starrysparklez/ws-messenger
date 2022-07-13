@@ -58,17 +58,22 @@ def makefake():
             "если вы находитесь в этом канале и видите это сообщение - это знак того, что в плане кодинга я не стою на месте, ведь я написала этот чат!",
         ),
     }
-    from app.models.text_channel import TextChannel
+    from app.models.channel import Channel
     from app.models.message import Message
 
+    admin = db.get_user(role='admin')
+    if not admin:
+        print('Can not process your command because admin role does not exist.\nPlease, use "manager.py setup" first.')
+        return
+
     for name, title in fake_channel_data:
-        print(f"Creating text channel #{name}...", end="\t")
-        channel = db.create_text_channel(TextChannel(name=name, description=title))
+        print(f"Creating channel #{name}...", end="\t")
+        channel = db.create_channel(Channel(name=name, topic=title, type='text'))
         print(f"OK")
         for text in fake_message_data[name]:
             print(f"Creating message...", end="\t")
             db.create_message(
-                Message(channel_id=channel.id, author_id=admin_user.id, content=text)
+                Message(channel=channel, author=admin, content=text)
             )
             print(f"OK")
     print("Fake data generation complete.")
@@ -79,10 +84,9 @@ def setup():
     print("Creating admin user...", end="\t")
     try:
         from app.models.user import User
-        admin = User(username=ADMIN_LOGIN)
+        admin = User(username=ADMIN_LOGIN, role='admin')
         admin.password = ADMIN_PASSWORD
-        admin.role = 101
-        db.create_user(admin)
+        db.create_user(admin, ignore_admin_limit=True)
     except Exception:
         print("FAIL")
         print(indent(format_exception(), "\t"))
