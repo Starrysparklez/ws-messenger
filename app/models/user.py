@@ -1,10 +1,14 @@
-import typing
+import typing, io
 from datetime import datetime
 from jwt import encode, decode
 from werkzeug.security import check_password_hash, generate_password_hash
-from config import SECRET_KEY, base_url
+from config import base_url
 from PIL import Image
 
+with io.open("keypair/public.pub", "r") as pub:
+    public_key = pub.read()
+with io.open("keypair/private", "r") as priv:
+    private_key = priv.read()
 
 class User:
     def __init__(self, **kwargs):
@@ -12,7 +16,7 @@ class User:
 
         Parameters
         ==========
-        id: int
+        id: str
             User ID
         username: str
             User name
@@ -24,26 +28,27 @@ class User:
             Account creation timestamp
         locale: str
             User's locale
+        discriminator: str
+            User's discriminator number.
         """
-        self.id: int = kwargs.pop("id", None)
+        self.id: str = kwargs.pop("id", None)
         self.username: str = kwargs.pop("username", None)
-        self.role: int = kwargs.pop("role", 0)
-        # Roles:
-        # 0 - default user
-        # 100 - admin
-        # 101 - superadmin
+        self.role: str = kwargs.pop("role", 'user')
         self.password_hash: str = kwargs.pop("password_hash", None)
         self.created_at: datetime = kwargs.pop("created_at", datetime.now())
         self.locale: str = kwargs.pop("locale", None)
+        self.discriminator: str = kwargs.pop('discriminator', '0000')
 
     def to_json(self) -> typing.Dict:
         """Convert to json."""
         return {
-            "id": str(self.id),
+            "id": self.id,
+            "role": self.role,
             "username": self.username,
             "avatar_url": self.avatar_url,
-            "created_at": str(self.created_at.timestamp()),
+            "created_at": self.created_at.strftime("%c"),
             "locale": self.locale,
+            'discriminator': self.discriminator
         }
 
     @property
@@ -59,22 +64,22 @@ class User:
 
     @property
     def avatar_url(self) -> str:
-        return f"{base_url}/static/usercontent/avatar_{self.id}.jpg"
+        return f"{base_url}/static/usercontent/avatars/{self.id}.jpg"
 
     @avatar_url.setter
     def avatar_url(self, new_avatar: bytes):
         im = Image.open(new_avatar)
         im_new = im.resize((256, 256), Image.BILINEAR)
-        im_new.save(f"app/static/usercontent/avatar_{self.id}.jpg", format="jpeg")
+        im_new.save(f"app/static/usercontent/avatars/{self.id}.jpg", format="jpeg")
 
     def generate_auth_token(self) -> str:
         payload = {"uid": self.id, "phs": self.password_hash}
-        return encode(payload, SECRET_KEY, algorithm="HS256")
+        return encode(payload, private_key, algorithm="RS256").decode('utf-8')
 
     @staticmethod
     def decode_auth_token(token) -> dict:
         try:
-            payload = decode(token, SECRET_KEY, algorithms=["HS256"])
+            payload = decode(token, public_key, algorithms=["RS256"])
         except:
             raise RuntimeError("Unable to decode authentication token.")
         return {"id": payload.get("uid"), "password_hash": payload.get("phs")}
