@@ -7,3 +7,5 @@ pyjwt
 eventlet
 snowflake-id
 psycopg2-binary
+cryptography
+pillow
